@@ -16,6 +16,7 @@ local:
     - kube-apiserver
     - kube-scheduler
     - kube-controller-manager
+    - kube-proxy
     - docker
     - kubelet
     - kube-addon

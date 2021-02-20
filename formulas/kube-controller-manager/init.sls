@@ -8,3 +8,9 @@ kube-controller-manager-download:
     - user: root
     - group: root
     - mode: 755
+
+kube-controller-manager-systemd:
+  file.managed:
+    - name: /etc/systemd/system/kube-controller-manager.service
+    - source: salt://kube-controller-manager/files/kube-controller-manager.service.j2
+    - template: jinja

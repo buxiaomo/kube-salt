@@ -11,6 +11,7 @@ ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 DOWNLOAD_WAY := "official"
 
 deploy:
+	salt '*' saltutil.sync_grains
 	salt '*' saltutil.refresh_pillar
 	salt '*' saltutil.refresh_modules
 	salt '*' saltutil.refresh_grains

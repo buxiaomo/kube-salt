@@ -8,3 +8,15 @@ kube-proxy-download:
     - user: root
     - group: root
     - mode: 755
+
+kube-proxy-config:
+  file.managed:
+    - name: /etc/kubernetes/kube-proxy.yaml
+    - source: salt://kube-proxy/files/kube-proxy.yaml.j2
+    - template: jinja
+
+kube-proxy-systemd:
+  file.managed:
+    - name: /etc/systemd/system/kube-proxy.service
+    - source: salt://kube-proxy/files/kube-proxy.service.j2
+    - template: jinja

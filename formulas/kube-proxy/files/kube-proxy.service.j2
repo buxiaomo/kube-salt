@@ -1,0 +1,19 @@
+{%- set hostname_override = salt['grains.get']('id') -%}
+{%- set loglevel = salt['pillar.get']('kube-proxy:log:logLevel') -%}
+[Unit]
+Description=Kubernetes Kube Proxy
+Documentation=https://github.com/kubernetes/kubernetes
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/kube-proxy \
+  --hostname-override={{ hostname_override }} \
+  --config=/etc/kubernetes/kube-proxy.yaml \
+  --v={{ loglevel }}
+
+Restart=always
+RestartSec=10s
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

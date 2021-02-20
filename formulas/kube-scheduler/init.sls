@@ -8,3 +8,9 @@ kube-scheduler-download:
     - user: root
     - group: root
     - mode: 755
+
+kube-scheduler-systemd:
+  file.managed:
+    - name: /etc/systemd/system/kube-scheduler.service
+    - source: salt://kube-scheduler/files/kube-scheduler.service.j2
+    - template: jinja

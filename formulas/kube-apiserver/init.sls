@@ -8,3 +8,25 @@ kube-apiserver-download:
     - user: root
     - group: root
     - mode: 755
+
+kube-apiserver-encryption-config:
+  file.managed:
+    - name: /etc/kubernetes/encryption-config.yaml
+    - source: salt://kube-apiserver/files/encryption-config.yaml.j2
+    - user: root
+    - group: root
+    - mode: 644
+
+kube-apiserver-audit-policy-minimal:
+  file.managed:
+    - name: /etc/kubernetes/audit-policy-minimal.yaml
+    - source: salt://kube-apiserver/files/audit-policy-minimal.yaml.j2
+    - user: root
+    - group: root
+    - mode: 644
+
+kube-apiserver-systemd:
+  file.managed:
+    - name: /etc/systemd/system/kube-apiserver.service
+    - source: salt://kube-apiserver/files/kube-apiserver.service.j2
+    - template: jinja

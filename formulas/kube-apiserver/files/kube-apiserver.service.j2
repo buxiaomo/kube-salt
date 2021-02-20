@@ -1,14 +1,18 @@
-{%- set etcdnode=[] -%}
-{%- if groups['etcd'] is not defined %}
-    {%- for host in groups['master'] -%}
-        {{ etcdnode.append(host) }}
-    {%- endfor%}
-{%- else%}
-    {%- for host in groups['etcd'] -%}
-        {{ etcdnode.append(host) }}
-    {%- endfor%}
-{%- endif %}
+{%- set authorization_mode = salt['pillar.get']('kube-apiserver:authorization_modes') -%}
+{%- set enable_admission_plugins = salt['pillar.get']('kube-apiserver:enable_admission_plugins') -%}
+{%- set bind_address = salt['pillar.get']('kube-apiserver:bind') %}
+{%- set kubelet_preferred_address_types = salt['pillar.get']('kube-apiserver:kubelet_preferred_address_types') -%}
+{%- set service_cluster_ip_range = salt['pillar.get']('kubernetes:PodCIDR') -%}
+{%- set service_node_port_range = salt['pillar.get']('kubernetes:NodePortRange') -%}
+{%- set loglevel = salt['pillar.get']('kube-apiserver:log:logLevel') -%}
+{%- set tls_cipher_suites = salt['pillar.get']('kube-apiserver:tls_cipher_suites') -%}
+{%- set advertise_address = salt['grains.get']('saltstack_default_ipv4') -%}
 
+{% set etcd_cluster_ep = [] -%}
+{% for server, addr in salt['mine.get']('roles:etcd', 'network.ip_addrs', tgt_type='grain').items() -%}
+{% if etcd_cluster_ep.append("https://" + addr[0] + ":2379") -%}
+{% endif -%}
+{% endfor -%}
 [Unit]
 Description=Kubernetes API Server
 Documentation=https://github.com/kubernetes/kubernetes
@@ -17,12 +21,12 @@ Documentation=https://github.com/kubernetes/kubernetes
 ExecStart=/usr/local/bin/kube-apiserver \
   --service-account-issuer=api \
   --api-audiences=api \
-  --service-account-signing-key-file={{ kubernetes.ssl.location }}/ca.key \
-  --authorization-mode={{ kubernetes.apiserver.authorization_modes | join(',') }} \
-  --enable-admission-plugins={{ kubernetes.apiserver.enable_admission_plugins | join(',') }} \
-  --tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_128_GCM_SHA256 \
-  --advertise-address={{ ansible_default_ipv4.address }} \
-  --bind-address={{ kubernetes.apiserver.bind | default('0.0.0.0') }}  \
+  --service-account-signing-key-file=/etc/kubernetes/pki/ca.key \
+  --authorization-mode={{ authorization_mode | join(',') }} \
+  --enable-admission-plugins={{ enable_admission_plugins | join(',') }} \
+  --tls-cipher-suites={{ tls_cipher_suites | join(',') }} \
+  --advertise-address={{ advertise_address }} \
+  --bind-address={{ bind_address }} \
   --secure-port=6443 \
   --insecure-port=0 \
   --anonymous-auth=false \
@@ -35,33 +39,33 @@ ExecStart=/usr/local/bin/kube-apiserver \
   --audit-log-maxsize=200 \
   --service-account-lookup=true \
   --storage-backend=etcd3 \
-  --etcd-cafile={{ kubernetes.ssl.location }}/etcd/ca.crt \
-  --etcd-certfile={{ kubernetes.ssl.location }}/apiserver-etcd-client.crt \
-  --etcd-keyfile={{ kubernetes.ssl.location }}/apiserver-etcd-client.key \
-  --etcd-servers={% for host in etcdnode %}https://{{ host }}:2379{% if not loop.last %},{% endif %}{% endfor %} \
+  --etcd-cafile=/etc/kubernetes/pki/etcd/ca.crt \
+  --etcd-certfile=/etc/kubernetes/pki/apiserver-etcd-client.crt \
+  --etcd-keyfile=/etc/kubernetes/pki/apiserver-etcd-client.key \
+  --etcd-servers={{ etcd_cluster_ep | join(',') }} \
   --event-ttl=4h \
   --experimental-encryption-provider-config=/etc/kubernetes/encryption-config.yaml \
   --enable-bootstrap-token-auth \
-  --client-ca-file={{ kubernetes.ssl.location }}/ca.crt \
+  --client-ca-file=/etc/kubernetes/pki/ca.crt \
   --kubelet-https \
-  --kubelet-client-certificate={{ kubernetes.ssl.location }}/apiserver-kubelet-client.crt \
-  --kubelet-client-key={{ kubernetes.ssl.location }}/apiserver-kubelet-client.key \
-  --kubelet-preferred-address-types={{ kubernetes.apiserver.kubelet_preferred_address_types | join(',') }} \
+  --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt \
+  --kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key \
+  --kubelet-preferred-address-types={{ kubelet_preferred_address_types | join(',') }} \
   --runtime-config=api/all=true \
-  --service-cluster-ip-range={{ kubernetes.settings.SvcCIDR }} \
-  --service-node-port-range={{ kubernetes.settings.NodePortRange }} \
-  --service-account-key-file={{ kubernetes.ssl.location }}/ca.key \
-  --tls-cert-file={{ kubernetes.ssl.location }}/apiserver.crt \
-  --tls-private-key-file={{ kubernetes.ssl.location }}/apiserver.key \
-  --requestheader-client-ca-file={{ kubernetes.ssl.location }}/ca.crt \
+  --service-cluster-ip-range={{ service_cluster_ip_range }} \
+  --service-node-port-range={{ service_node_port_range }} \
+  --service-account-key-file=/etc/kubernetes/pki/ca.key \
+  --tls-cert-file=/etc/kubernetes/pki/apiserver.crt \
+  --tls-private-key-file=/etc/kubernetes/pki/apiserver.key \
+  --requestheader-client-ca-file=/etc/kubernetes/pki/ca.crt \
   --requestheader-username-headers=X-Remote-User \
   --requestheader-group-headers=X-Remote-Group \
   --requestheader-allowed-names=front-proxy-client \
   --requestheader-extra-headers-prefix=X-Remote-Extra- \
-  --proxy-client-cert-file={{ kubernetes.ssl.location }}/front-proxy-client.crt \
-  --proxy-client-key-file={{ kubernetes.ssl.location }}/front-proxy-client.key \
+  --proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt \
+  --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key \
   --profiling=false \
-  --v={{ kubernetes.apiserver.log.logLevel | default(2) }}
+  --v={{ loglevel }}
 
 Restart=on-failure
 RestartSec=5

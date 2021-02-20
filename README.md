@@ -71,7 +71,7 @@ mine_functions:
   grains.items: []
   network.interfaces: []
   network.ip_addrs:
-    - ens192
+    interface: ens192
 EOF
 
 cat > /etc/salt/minion.d/grains.conf << EOF

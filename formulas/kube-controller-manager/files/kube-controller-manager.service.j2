@@ -1,0 +1,69 @@
+{%- set bind_address = salt['pillar.get']('kube-controller-manager:bind') %}
+{%- set cluster_cidr = salt['pillar.get']('kubernetes:PodCIDR') -%}
+{%- set service_cluster_ip_range = salt['pillar.get']('kubernetes:SvcCIDR') -%}
+{%- set terminated_pod_gc_threshold = salt['pillar.get']('kube-controller-manager:terminatedPodGcThreshold') %}
+{%- set nodeMonitorPeriod = salt['pillar.get']('kube-controller-manager:nodeMonitorPeriod') %}
+{%- set nodeStatusUpdate = salt['pillar.get']('kube-controller-manager:podEvictionTimeout') %}
+{%- set loglevel = salt['pillar.get']('kube-controller-manager:log:logLevel') -%}
+[Unit]
+Description=Kubernetes Controller Manager
+Documentation=https://github.com/kubernetes/kubernetes
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/kube-controller-manager \
+  --allocate-node-cidrs=true \
+  --authentication-kubeconfig=/etc/kubernetes/kube-controller-manager.kubeconfig \
+  --authorization-kubeconfig=/etc/kubernetes/kube-controller-manager.kubeconfig \
+  --kubeconfig=/etc/kubernetes/kube-controller-manager.kubeconfig \
+  --bind-address={{ bind_address }} \
+  --tls-cert-file=/etc/kubernetes/pki/kube-controller-manager.crt \
+  --tls-private-key-file=/etc/kubernetes/pki/kube-controller-manager.key \
+  --client-ca-file=/etc/kubernetes/pki/ca.crt \
+  --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt \
+  --cluster-signing-key-file=/etc/kubernetes/pki/ca.key \
+  --leader-elect=true \
+  --cluster-cidr={{ cluster_cidr }} \
+  --service-cluster-ip-range={{ service_cluster_ip_range }} \
+  --requestheader-client-ca-file=/etc/kubernetes/pki/ca.crt \
+  --service-account-private-key-file=/etc/kubernetes/pki/ca.key \
+  --root-ca-file=/etc/kubernetes/pki/ca.crt \
+  --use-service-account-credentials=true \
+  --controllers=*,bootstrapsigner,tokencleaner \
+  --experimental-cluster-signing-duration=8760h \
+  --feature-gates=RotateKubeletServerCertificate=true \
+  --profiling=false \
+  --terminated-pod-gc-threshold={{ terminated_pod_gc_threshold }} \
+  --node-monitor-period=
+{%- if nodeMonitorPeriod == 'Fast' -%}
+    2s
+{%- else -%}
+    5s
+{%- endif %} \
+  --node-monitor-grace-period=
+{%- if nodeStatusUpdate == 'Fast' -%}
+          20s
+{%- elif nodeStatusUpdate == 'Medium' -%}
+          2m
+{%- elif nodeStatusUpdate == 'Low' -%}
+          5m
+{%- else -%}
+          40s
+{%- endif %} \
+  --pod-eviction-timeout= 
+{%- if nodeStatusUpdate == 'Fast' -%}
+          30s
+{%- elif nodeStatusUpdate == 'Medium' -%}
+          1m
+{%- elif nodeStatusUpdate == 'Low' -%}
+          1m
+{%- else -%}
+          5m
+{%- endif %} \
+  --v={{ loglevel }}
+
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target
