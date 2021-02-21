@@ -1,15 +1,8 @@
-/etc/ssl/kubernetes:
-  file.directory:
-    - user: root
-    - group: root
-    - mode: 755
-
 /etc/ssl/kubernetes/ca.key:
   x509.private_key_managed:
     - bits: 4096
     - backup: True
-    - require:
-      - file: /etc/ssl/kubernetes
+    - makedirs: True
 
 /etc/ssl/kubernetes/ca.crt:
   x509.certificate_managed:
@@ -26,7 +19,31 @@
     - authorityKeyIdentifier: keyid,issuer:always
     - days_valid: 3650
     - days_remaining: 0
-    - backup: True
     - require:
-      - file: /etc/ssl/kubernetes
       - x509: /etc/ssl/kubernetes/ca.key
+    - makedirs: True
+    - backup: True
+
+/etc/kubernetes/pki/ca.crt:
+  file.managed:
+    - source: salt://kubernetes/ca.crt
+    - user: root
+    - group: root
+    - mode: 755
+    - makedirs: True
+
+/etc/kubernetes/pki/ca.key:
+  file.managed:
+    - source: salt://kubernetes/ca.key
+    - user: root
+    - group: root
+    - mode: 755
+    - makedirs: True
+
+/etc/kubernetes/pki/openssl.cnf:
+  file.managed:
+    - source: salt://kube-apiserver/files/openssl.cnf.j2
+    - user: root
+    - group: root
+    - template: jinja
+    - makedirs: True

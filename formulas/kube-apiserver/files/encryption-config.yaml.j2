@@ -1,3 +1,4 @@
+{%- set secret = pillar['kube-apiserver']['encryption'] -%}
 kind: EncryptionConfig
 apiVersion: v1
 resources:
@@ -7,5 +8,5 @@ resources:
       - aescbc:
           keys:
             - name: key1
-              secret: {{ pillar['kube-apiserver']['encryption'] }}
+              secret: {{ secret }}
       - identity: {}

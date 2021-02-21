@@ -5,9 +5,8 @@ docker-pkg:
       - tar
       - unzip
 
-docker-download:
+/usr/local/src/docker-20.10.3.tgz:
   file.managed:
-    - name: /usr/local/src/docker-20.10.3.tgz
     - source: http://artifacts.splunk.org.cn/linux/static/stable/x86_64/docker-20.10.3.tgz
     - skip_verify: True
 
@@ -49,3 +48,4 @@ docker-service:
       - file: docker-systemd
     - watch:
       - file: docker-daemon
+      - file: docker-systemd

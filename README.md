@@ -83,7 +83,7 @@ EOF
 cat > /etc/salt/minion.d/grains.conf << EOF
 grains:
   roles:
-    - etcd
+    - kube-etcd
     - kube-master
 EOF
 

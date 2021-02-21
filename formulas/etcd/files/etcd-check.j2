@@ -1,0 +1,27 @@
+#!/bin/bash
+{% set cluster_ep = [] -%}
+{% for server, addr in salt['mine.get']('roles:kube-etcd', 'network.ip_addrs', tgt_type='grain').items() -%}
+{% if cluster_ep.append( addr[0] + ":2379") -%}
+{% endif -%}
+{% endfor -%}
+
+echo -e "\033[32m=> endpoint health <=\033[0m"
+ETCDCTL_API=3 /usr/local/bin/etcdctl --endpoints {{ cluster_ep | join(',') | lower }}  \
+--cacert /etc/kubernetes/pki/ca.crt \
+--cert /etc/kubernetes/pki/etcd/healthcheck-client.crt \
+--key /etc/kubernetes/pki/etcd/healthcheck-client.key \
+endpoint health --write-out=table
+
+echo -e "\033[32m=> endpoint status <=\033[0m"
+ETCDCTL_API=3 /usr/local/bin/etcdctl --endpoints {{ cluster_ep | join(',') | lower }}  \
+--cacert /etc/kubernetes/pki/ca.crt \
+--cert /etc/kubernetes/pki/etcd/healthcheck-client.crt \
+--key /etc/kubernetes/pki/etcd/healthcheck-client.key \
+endpoint status --write-out=table
+
+# echo -e "\033[32m=> defrag <=\033[0m"
+# ETCDCTL_API=3 /usr/local/bin/etcdctl --endpoints {{ cluster_ep | join(',') | lower }}  \
+# --cacert /etc/kubernetes/pki/ca.crt \
+# --cert /etc/kubernetes/pki/etcd/healthcheck-client.crt \
+# --key /etc/kubernetes/pki/etcd/healthcheck-client.key \
+# defrag

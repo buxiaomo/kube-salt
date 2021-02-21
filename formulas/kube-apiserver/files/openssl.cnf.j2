@@ -1,0 +1,76 @@
+{%- set DNSIP = salt['pillar.get']('kubernetes:DNSIP') -%}
+{%- set SvcIP = salt['pillar.get']('kubernetes:SvcIP') -%}
+{%- set ClusterDomain = salt['pillar.get']('kubernetes:ClusterDomain') -%}
+
+{%- set allnode, etcdnode=[],[] -%}
+
+{% for server, addr in salt['mine.get']('roles:kube-master', 'network.ip_addrs', tgt_type='grain').items() -%}
+{% if allnode.append(addr[0]) -%}
+{% endif -%}
+{% endfor -%}
+
+{% for server, addr in salt['mine.get']('roles:kube-worker', 'network.ip_addrs', tgt_type='grain').items() -%}
+{% if allnode.append(addr[0]) -%}
+{% endif -%}
+{% endfor -%}
+
+{% for server, addr in salt['mine.get']('roles:kube-etcd', 'network.ip_addrs', tgt_type='grain').items() -%}
+{% if etcdnode.append(addr[0]) -%}
+{% endif -%}
+{% endfor -%}
+
+{%- set ClusterDomain = salt['pillar.get']('kubernetes:ClusterDomain') -%}
+
+[ req ]
+default_bits = 2048
+default_md = sha256
+distinguished_name = req_distinguished_name
+
+[req_distinguished_name]
+
+[ v3_ca ]
+basicConstraints = critical, CA:TRUE
+keyUsage = critical, digitalSignature, keyEncipherment, keyCertSign
+
+[ v3_req_server ]
+basicConstraints = CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+
+[ v3_req_client ]
+basicConstraints = CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth
+
+[ v3_req_apiserver ]
+basicConstraints = CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names_cluster
+
+[ v3_req_etcd ]
+basicConstraints = CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth, clientAuth
+subjectAltName = @alt_names_etcd
+
+[ alt_names_cluster ]
+DNS.1 = localhost
+DNS.2 = kubernetes
+DNS.3 = kubernetes.default
+DNS.4 = kubernetes.default.svc
+DNS.5 = kubernetes.default.svc.{{ ClusterDomain }}
+IP.1 = {{ SvcIP }}
+IP.2 = 127.0.0.1
+{% if  allnode | length > 0 %}
+{% for host in allnode | unique %}IP.{{ loop.index + 2 }} = {{ host }}
+{% endfor %}
+{% endif %}
+
+[ alt_names_etcd ]
+DNS.1 = localhost
+IP.1 = 127.0.0.1
+{% if  etcdnode | length > 0 %}
+{% for host in etcdnode %}IP.{{ loop.index + 1 }} = {{ host }}
+{% endfor %}
+{% endif %}

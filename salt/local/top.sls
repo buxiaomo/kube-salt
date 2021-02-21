@@ -2,9 +2,13 @@ local:
   '*':
     - common
 
-  'roles:etcd':
+  'roles:ca':
     - match: grain
-    - etcd
+    - ca
+
+  'roles:kube-etcd':
+    - match: grain
+    - kube-etcd
 
   'roles:kube-master':
     - match: grain

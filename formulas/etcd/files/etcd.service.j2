@@ -1,0 +1,49 @@
+{%- set hostname_override = salt['grains.get']('id') -%}
+{% set datadir = salt['pillar.get']('etcd:datadir') %}
+{%- set advertise_address = salt['grains.get']('saltstack_default_ipv4') -%}
+
+{% set cluster_ep = [] -%}
+{% for server, addr in salt['mine.get']('roles:kube-etcd', 'network.ip_addrs', tgt_type='grain').items() -%}
+{% if cluster_ep.append( server + "=https://" + addr[0] + ":2380") -%}
+{% endif -%}
+{% endfor -%}
+
+[Unit]
+Description=etcd
+Documentation=https://github.com/coreos/etcd
+Conflicts=etcd.service
+Conflicts=etcd2.service
+
+[Service]
+User=etcd
+Type=notify
+Restart=always
+RestartSec=5s
+LimitNOFILE=40000
+TimeoutStartSec=0
+ExecStart=/usr/local/bin/etcd \
+  --name={{ hostname_override }} \
+  --data-dir={{ datadir }} \
+  --listen-client-urls=https://127.0.0.1:2379,https://{{ advertise_address }}:2379 \
+  --advertise-client-urls=https://{{ advertise_address }}:2379 \
+  --listen-peer-urls=https://{{ advertise_address }}:2380 \
+  --initial-advertise-peer-urls=https://{{ advertise_address }}:2380 \
+  --initial-cluster={{ cluster_ep | join(',') | lower }} \
+  --initial-cluster-token=kubernetes-etcd-cluster \
+  --initial-cluster-state=new \
+  --client-cert-auth=true \
+  --trusted-ca-file=/etc/kubernetes/pki/ca.crt \
+  --cert-file=/etc/kubernetes/pki/etcd/server.crt \
+  --key-file=/etc/kubernetes/pki/etcd/server.key \
+  --peer-client-cert-auth=true \
+  --peer-trusted-ca-file=/etc/kubernetes/pki/ca.crt \
+  --peer-cert-file=/etc/kubernetes/pki/etcd/peer.crt \
+  --peer-key-file=/etc/kubernetes/pki/etcd/peer.key \
+  --snapshot-count=10000 \
+  --auto-compaction-retention=1 \
+  --max-request-bytes=10485760 \
+  --quota-backend-bytes=8589934592 \
+  --listen-metrics-urls=http://127.0.0.1:2381
+
+[Install]
+WantedBy=multi-user.target

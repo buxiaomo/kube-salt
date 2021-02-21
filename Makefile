@@ -19,9 +19,10 @@ deploy:
 	salt '*' mine.update
 	salt '*' mine.flush
 	salt-run saltutil.sync_all
+	
+	salt '*' state.sls certificate
+	salt -G 'roles:kube-etcd' state.applystate.sls etcd
 	salt '*' state.apply
-	salt -G 'roles:ca' state.sls certificate.create
-	salt -G 'roles:etcd' state.apply
 
 download:
 	@echo -e "\033[32mDownload the binaries package to ./scripts/binaries directory...\033[0m"

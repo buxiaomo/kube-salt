@@ -2,7 +2,7 @@ local:
   '*':
     - common
 
-  'roles:etcd':
+  'roles:kube-etcd':
     - match: grain_pcre
     - etcd
 
