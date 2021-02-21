@@ -1,5 +1,5 @@
 include:
   - docker
-  - kubectl
-  - kube-proxy
-  - kubelet
+  # - kubectl
+  # - kube-proxy
+  # - kubelet

@@ -2,7 +2,7 @@
 {%- set enable_admission_plugins = salt['pillar.get']('kube-apiserver:enable_admission_plugins') -%}
 {%- set bind_address = salt['pillar.get']('kube-apiserver:bind') %}
 {%- set kubelet_preferred_address_types = salt['pillar.get']('kube-apiserver:kubelet_preferred_address_types') -%}
-{%- set service_cluster_ip_range = salt['pillar.get']('kubernetes:PodCIDR') -%}
+{%- set service_cluster_ip_range = salt['pillar.get']('kubernetes:SvcCIDR') -%}
 {%- set service_node_port_range = salt['pillar.get']('kubernetes:NodePortRange') -%}
 {%- set loglevel = salt['pillar.get']('kube-apiserver:log:logLevel') -%}
 {%- set tls_cipher_suites = salt['pillar.get']('kube-apiserver:tls_cipher_suites') -%}

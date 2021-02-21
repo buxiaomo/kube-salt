@@ -1,3 +1,6 @@
+include:
+  - certificate
+
 {% set kube_version = salt['pillar.get']('kubernetes:version') %}
 {%- set hostname_override = salt['grains.get']('id') -%}
 {%- set advertise_address = salt['grains.get']('saltstack_default_ipv4') -%}
@@ -9,17 +12,6 @@
     - user: root
     - group: root
     - mode: 755
-
-/etc/kubernetes/manifests:
-  file.directory:
-    - user: root
-    - group: root
-    - mode: 755
-    - makedirs: True
-
-unmount-swaps:
-  cmd.run:
-    - name: /sbin/swapoff -a
 
 /etc/kubernetes/pki/kubelet.key:
   cmd.run:
@@ -55,6 +47,7 @@ unmount-swaps:
     - unless: openssl x509 -in kubelet.crt -noout -text -checkend 2592000
     - require:
       - cmd: /etc/kubernetes/pki/kubelet.csr
+      - sls: certificate
 
 kubelet-kubeconfig-cluster:
   cmd.run:
@@ -62,7 +55,8 @@ kubelet-kubeconfig-cluster:
     - user: root
     - group: root
     - cwd: /etc/kubernetes
-
+    - require:
+      - sls: certificate
 kubelet-kubeconfig-credentials:
   cmd.run:
     - name: /usr/local/bin/kubectl config set-credentials system:node:{{ hostname_override }} --embed-certs=true --client-certificate=/etc/kubernetes/pki/kubelet.crt --client-key=/etc/kubernetes/pki/kubelet.key --kubeconfig=/etc/kubernetes/kubelet.kubeconfig
@@ -70,12 +64,11 @@ kubelet-kubeconfig-credentials:
     - group: root
     - cwd: /etc/kubernetes
     - require:
-      - cmd: admin-certificate-key
-      - cmd: admin-certificate-crt
+      - cmd: /etc/kubernetes/pki/kubelet.key
+      - cmd: /etc/kubernetes/pki/kubelet.crt
     - watch:
-      - cmd: admin-certificate-key
-      - cmd: admin-certificate-crt
-
+      - cmd: /etc/kubernetes/pki/kubelet.key
+      - cmd: /etc/kubernetes/pki/kubelet.crt
 kubelet-kubeconfig-set-context:
   cmd.run:
     - name: /usr/local/bin/kubectl config set-context kubernetes --cluster=kubernetes --user=system:node:{{ hostname_override }} --kubeconfig=/etc/kubernetes/kubelet.kubeconfig
@@ -83,9 +76,11 @@ kubelet-kubeconfig-set-context:
     - group: root
     - cwd: /etc/kubernetes
     - require:
-      - cmd: admin-kubeconfig-cluster
-      - cmd: admin-kubeconfig-credentials
-
+      - cmd: kubelet-kubeconfig-credentials
+      - cmd: kubelet-kubeconfig-cluster
+    - watch:
+      - cmd: kubelet-kubeconfig-credentials
+      - cmd: kubelet-kubeconfig-cluster
 kubelet-kubeconfig-use-context:
   cmd.run:
     - name: /usr/local/bin/kubectl config use-context kubernetes --kubeconfig=/etc/kubernetes/kubelet.kubeconfig
@@ -93,13 +88,24 @@ kubelet-kubeconfig-use-context:
     - group: root
     - cwd: /etc/kubernetes
     - require:
-      - cmd: admin-kubeconfig-set-context
+      - cmd: kubelet-kubeconfig-set-context
 
 /etc/kubernetes/kubelet.yaml:
   file.managed:
     - source: salt://kubelet/files/kubelet.yaml.j2
     - template: jinja
     - makedirs: True
+
+/etc/kubernetes/manifests:
+  file.directory:
+    - user: root
+    - group: root
+    - mode: 755
+    - makedirs: True
+
+unmount-swaps:
+  cmd.run:
+    - name: /sbin/swapoff -a
 
 /etc/systemd/system/kubelet.service:
   file.managed:
@@ -116,6 +122,7 @@ kubelet-service:
       - file: /etc/kubernetes/kubelet.yaml
       - file: /etc/systemd/system/kubelet.service
       - cmd: /etc/kubernetes/pki/kubelet.crt
+      - file: /etc/kubernetes/manifests
       - cmd: unmount-swaps
     - watch:
       - file: /usr/local/bin/kubelet

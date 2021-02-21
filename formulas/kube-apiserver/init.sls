@@ -1,3 +1,6 @@
+include:
+  - certificate
+
 {% set kube_version = salt['pillar.get']('kubernetes:version') %}
 
 /usr/local/bin/kube-apiserver:
@@ -43,6 +46,7 @@
     - unless: openssl x509 -in /etc/kubernetes/pki/apiserver.crt -noout -text -checkend 2592000
     - require:
       - cmd: /etc/kubernetes/pki/apiserver.csr
+      - sls: certificate
 
 
 /etc/kubernetes/pki/front-proxy-client.key:
@@ -80,6 +84,7 @@
     - unless: openssl x509 -in /etc/kubernetes/pki/front-proxy-client.crt -noout -text -checkend 2592000
     - require:
       - cmd: /etc/kubernetes/pki/front-proxy-client.csr
+      - sls: certificate
 
 /etc/kubernetes/pki/apiserver-kubelet-client.key:
   cmd.run:
@@ -116,6 +121,7 @@
     - unless: openssl x509 -in /etc/kubernetes/pki/apiserver-kubelet-client.crt -noout -text -checkend 2592000
     - require:
       - cmd: /etc/kubernetes/pki/apiserver-kubelet-client.csr
+      - sls: certificate
 
 /etc/kubernetes/pki/apiserver-etcd-client.key:
   cmd.run:
@@ -153,6 +159,7 @@
     - require:
       - cmd: /etc/kubernetes/pki/apiserver-etcd-client.csr
       - cmd: /etc/kubernetes/pki/apiserver-etcd-client.key
+      - sls: certificate
 
 /etc/kubernetes/encryption-config.yaml:
   file.managed:
@@ -176,6 +183,9 @@
     - name: /etc/systemd/system/kube-apiserver.service
     - source: salt://kube-apiserver/files/kube-apiserver.service.j2
     - template: jinja
+    - require:
+      - file: /etc/kubernetes/audit-policy-minimal.yaml
+      - file: /etc/kubernetes/encryption-config.yaml
 
 kube-apiserver-service:
   service.running:
@@ -189,3 +199,7 @@ kube-apiserver-service:
     - watch:
       - file: /usr/local/bin/kube-apiserver
       - file: /etc/systemd/system/kube-apiserver.service
+      - file: /etc/kubernetes/audit-policy-minimal.yaml
+      - file: /etc/kubernetes/encryption-config.yaml
+      - cmd: /etc/kubernetes/pki/apiserver.key
+      - cmd: /etc/kubernetes/pki/apiserver.crt

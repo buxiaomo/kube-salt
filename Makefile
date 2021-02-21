@@ -15,14 +15,16 @@ deploy:
 	salt '*' saltutil.refresh_pillar
 	salt '*' saltutil.refresh_modules
 	salt '*' saltutil.refresh_grains
-	salt '*' grains.ls
 	salt '*' mine.update
 	salt '*' mine.flush
-	salt-run saltutil.sync_all
-	
+	salt '*' grains.get roles
+	salt '*' grains.get saltstack_default_ipv4
+	salt '*' mine.get '*' network.ip_addrs
 	salt '*' state.sls certificate
-	salt -G 'roles:kube-etcd' state.applystate.sls etcd
+	salt -G 'roles:kube-etcd' state.apply
 	salt '*' state.apply
+
+	salt-run jobs.lookup_jid 20210221155656656485
 
 download:
 	@echo -e "\033[32mDownload the binaries package to ./scripts/binaries directory...\033[0m"

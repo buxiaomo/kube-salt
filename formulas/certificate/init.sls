@@ -3,6 +3,7 @@
     - bits: 4096
     - backup: True
     - makedirs: True
+    - unless: test -f /etc/ssl/kubernetes/ca.key
 
 /etc/ssl/kubernetes/ca.crt:
   x509.certificate_managed:
@@ -29,16 +30,20 @@
     - source: salt://kubernetes/ca.crt
     - user: root
     - group: root
-    - mode: 755
+    - mode: 644
     - makedirs: True
+    - require:
+      - x509: /etc/ssl/kubernetes/ca.crt
 
 /etc/kubernetes/pki/ca.key:
   file.managed:
     - source: salt://kubernetes/ca.key
     - user: root
     - group: root
-    - mode: 755
+    - mode: 600
     - makedirs: True
+    - require:
+      - x509: /etc/ssl/kubernetes/ca.key
 
 /etc/kubernetes/pki/openssl.cnf:
   file.managed:

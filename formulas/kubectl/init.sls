@@ -1,5 +1,8 @@
+include:
+  - certificate
+
 {% set kube_version = salt['pillar.get']('kubernetes:version') %}
-{%- set advertise_address = salt['grains.get']('saltstack_default_ipv4') -%}
+{% set advertise_address = salt['grains.get']('saltstack_default_ipv4') %}
 
 /usr/local/bin/kubectl:
   file.managed:
@@ -7,9 +10,9 @@
     - skip_verify: True
     - user: root
     - group: root
-    - mode: 755
+    - mode: 711
 
-admin-certificate-key:
+/etc/kubernetes/pki/admin.key:
   cmd.run:
     - name: openssl genrsa -out admin.key 2048
     - user: root
@@ -20,31 +23,28 @@ admin-certificate-key:
     - makedirs: True
     - unless: test -f /etc/kubernetes/pki/admin.key
 
-admin-certificate-csr:
+/etc/kubernetes/pki/admin.csr:
   cmd.run:
     - name: openssl req -new -key admin.key -subj "/CN=admin/O=system:masters" -out admin.csr
-    - user: root
-    - group: root
     - cwd: /etc/kubernetes/pki
     - env:
       - RANDFILE: /tmp/.random
     - makedirs: True
     - unless: test -f /etc/kubernetes/pki/admin.csr
     - require:
-      - cmd: admin-certificate-key
+      - cmd: /etc/kubernetes/pki/admin.key
 
-admin-certificate-crt:
+/etc/kubernetes/pki/admin.crt:
   cmd.run:
     - name: openssl x509 -req -in admin.csr -CA ca.crt -CAkey ca.key -CAcreateserial -extensions v3_req_client -extfile openssl.cnf -out admin.crt -days 3652
-    - user: root
-    - group: root
     - cwd: /etc/kubernetes/pki
     - env:
       - RANDFILE: /tmp/.random
     - makedirs: True
     - unless: openssl x509 -in admin.crt -noout -text -checkend 2592000
     - require:
-      - cmd: admin-certificate-csr
+      - cmd: /etc/kubernetes/pki/admin.csr
+      - sls: certificate
 
 admin-kubeconfig-cluster:
   cmd.run:
@@ -52,6 +52,11 @@ admin-kubeconfig-cluster:
     - user: root
     - group: root
     - cwd: /etc/kubernetes
+    - unless: test -f /etc/kubernetes/admin.kubeconfig
+    - require:
+      - sls: certificate
+    - watch:
+      - sls: certificate
 
 admin-kubeconfig-credentials:
   cmd.run:
@@ -60,11 +65,11 @@ admin-kubeconfig-credentials:
     - group: root
     - cwd: /etc/kubernetes
     - require:
-      - cmd: admin-certificate-key
-      - cmd: admin-certificate-crt
+      - cmd: /etc/kubernetes/pki/admin.key
+      - cmd: /etc/kubernetes/pki/admin.crt
     - watch:
-      - cmd: admin-certificate-key
-      - cmd: admin-certificate-crt
+      - cmd: /etc/kubernetes/pki/admin.key
+      - cmd: /etc/kubernetes/pki/admin.crt
 
 admin-kubeconfig-set-context:
   cmd.run:
@@ -73,6 +78,9 @@ admin-kubeconfig-set-context:
     - group: root
     - cwd: /etc/kubernetes
     - require:
+      - cmd: admin-kubeconfig-cluster
+      - cmd: admin-kubeconfig-credentials
+    - watch:
       - cmd: admin-kubeconfig-cluster
       - cmd: admin-kubeconfig-credentials
 
@@ -84,6 +92,8 @@ admin-kubeconfig-use-context:
     - cwd: /etc/kubernetes
     - require:
       - cmd: admin-kubeconfig-set-context
+    - watch:
+      - cmd: admin-kubeconfig-set-context
 
 /root/.kube/config:
   file.symlink:
@@ -92,3 +102,13 @@ admin-kubeconfig-use-context:
     - makedirs: True
     - require:
       - cmd: admin-kubeconfig-use-context
+    - watch:
+      - cmd: admin-kubeconfig-use-context
+
+/etc/bash_completion.d/kubectl:
+  file.managed:
+    - source: salt://kubectl/files/kubectl.sh
+    - user: root
+    - group: root
+    - mode: 755
+    - makedirs: True

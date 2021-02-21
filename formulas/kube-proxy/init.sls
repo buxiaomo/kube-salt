@@ -1,5 +1,7 @@
-{% set kube_version = salt['pillar.get']('kubernetes:version') %}
+include:
+  - certificate
 
+{% set kube_version = salt['pillar.get']('kubernetes:version') %}
 {%- set advertise_address = salt['grains.get']('saltstack_default_ipv4') -%}
 
 /usr/local/bin/kube-proxy:
@@ -17,7 +19,6 @@
     - env:
       - RANDFILE: /tmp/.random
     - unless: test -f /etc/kubernetes/pki/kube-proxy.key
-
 /etc/kubernetes/pki/kube-proxy.csr:
   cmd.run:
     - name: openssl req -new -key kube-proxy.key -subj "/CN=system:kube-proxy/O=system:node-proxier" -out kube-proxy.csr
@@ -27,7 +28,6 @@
     - unless: test -f /etc/kubernetes/pki/kube-proxy.csr
     - require:
       - cmd: /etc/kubernetes/pki/kube-proxy.key
-
 /etc/kubernetes/pki/kube-proxy.crt:
   cmd.run:
     - name: openssl x509 -req -in kube-proxy.csr -CA ca.crt -CAkey ca.key -CAcreateserial -extensions v3_req_client -extfile openssl.cnf -out kube-proxy.crt -days 3652
@@ -37,6 +37,7 @@
     - unless: openssl x509 -in /etc/kubernetes/pki/kube-proxy.crt -noout -text -checkend 2592000
     - require:
       - cmd: /etc/kubernetes/pki/kube-proxy.csr
+      - sls: certificate
 
 kube-proxy-kubeconfig-cluster:
   cmd.run:
@@ -44,7 +45,8 @@ kube-proxy-kubeconfig-cluster:
     - user: root
     - group: root
     - cwd: /etc/kubernetes
-
+    - require:
+      - sls: certificate
 kube-proxy-kubeconfig-credentials:
   cmd.run:
     - name: /usr/local/bin/kubectl config set-credentials kube-proxy --embed-certs=true --client-certificate=/etc/kubernetes/pki/kube-proxy.crt --client-key=/etc/kubernetes/pki/kube-proxy.key --kubeconfig=/etc/kubernetes/kube-proxy.kubeconfig
@@ -52,8 +54,11 @@ kube-proxy-kubeconfig-credentials:
     - group: root
     - cwd: /etc/kubernetes
     - require:
-      - cmd: kube-proxy-kubeconfig-cluster
-
+      - cmd: /etc/kubernetes/pki/kube-proxy.key
+      - cmd: /etc/kubernetes/pki/kube-proxy.crt
+    - watch:
+      - cmd: /etc/kubernetes/pki/kube-proxy.key
+      - cmd: /etc/kubernetes/pki/kube-proxy.crt
 kube-proxy-kubeconfig-set-context:
   cmd.run:
     - name: /usr/local/bin/kubectl config set-context kubernetes --cluster=kubernetes --user=kube-proxy --kubeconfig=/etc/kubernetes/kube-proxy.kubeconfig
@@ -62,7 +67,10 @@ kube-proxy-kubeconfig-set-context:
     - cwd: /etc/kubernetes
     - require:
       - cmd: kube-proxy-kubeconfig-credentials
-
+      - cmd: kube-proxy-kubeconfig-cluster
+    - watch:
+      - cmd: kube-proxy-kubeconfig-credentials
+      - cmd: kube-proxy-kubeconfig-cluster
 kube-proxy-kubeconfig-use-context:
   cmd.run:
     - name: /usr/local/bin/kubectl config use-context kubernetes --kubeconfig=/etc/kubernetes/kube-proxy.kubeconfig
